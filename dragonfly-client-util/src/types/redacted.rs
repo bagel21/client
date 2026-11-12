@@ -138,6 +138,22 @@ impl fmt::Debug for KeyHeaderMap<'_> {
     }
 }
 
+/// Debug-safe wrapper around [`http::Request`] that prints the request line
+/// and the key headers, with the URI printed through [`RedactedUrl`].
+pub struct RedactedRequest<'a, B>(pub &'a http::Request<B>);
+
+/// Debug implementation that prints the request without the body.
+impl<B> fmt::Debug for RedactedRequest<'_, B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Request")
+            .field("method", self.0.method())
+            .field("uri", &RedactedUrl(&self.0.uri().to_string()))
+            .field("version", &self.0.version())
+            .field("headers", &KeyHeaderMap(self.0.headers()))
+            .finish_non_exhaustive()
+    }
+}
+
 /// Debug-safe wrapper around [`Download`].
 ///
 /// Use at log sites that would otherwise Debug-print the full `Download`
@@ -653,6 +669,21 @@ mod tests {
             http::HeaderValue::from_bytes(b"/key?sig=secret\xff").unwrap(),
         );
         assert!(format!("{:?}", KeyHeaderMap(&headers)).contains(r#""location": "[REDACTED]""#));
+    }
+
+    #[test]
+    fn redacted_request_debug_redacts_uri_and_prints_only_key_headers() {
+        let request = http::Request::builder()
+            .uri("https://example.com/key?X-Amz-Signature=secret&ns=docker.io")
+            .header("authorization", "Bearer secret")
+            .header("user-agent", "containerd")
+            .body(())
+            .unwrap();
+
+        assert_eq!(
+            format!("{:?}", RedactedRequest(&request)),
+            r#"Request { method: GET, uri: "https://example.com/key?X-Amz-Signature=[REDACTED]&ns=docker.io", version: HTTP/1.1, headers: {"user-agent": "containerd"}, .. }"#
+        );
     }
 
     #[test]

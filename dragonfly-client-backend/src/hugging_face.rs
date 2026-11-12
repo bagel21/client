@@ -44,7 +44,9 @@ use dragonfly_client_core::{
     error::{BackendError, ErrorType, OrErr},
     Error, Result,
 };
-use dragonfly_client_util::{http::validate_ranged_response, tls::NoVerifier};
+use dragonfly_client_util::{
+    http::validate_ranged_response, tls::NoVerifier, types::redacted::KeyHeaderMap,
+};
 use futures::{StreamExt, TryStreamExt};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_LENGTH, RANGE, USER_AGENT};
 use reqwest::Client;
@@ -364,7 +366,9 @@ impl Backend for HuggingFace {
     async fn stat(&self, request: StatRequest) -> Result<StatResponse> {
         debug!(
             "stat request {} {}: {:?}",
-            request.task_id, request.url, request.http_header
+            request.task_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Build request headers, including authentication if provided hugging face token.
@@ -444,7 +448,7 @@ impl Backend for HuggingFace {
                     download_url,
                     response_status_code,
                     content_length,
-                    response_header
+                    KeyHeaderMap(&response_header)
                 );
 
                 Ok(StatResponse {
@@ -558,7 +562,7 @@ impl Backend for HuggingFace {
                     repository_revision_url,
                     response_status_code,
                     content_length,
-                    response_header
+                    KeyHeaderMap(&response_header)
                 );
 
                 Ok(StatResponse {
@@ -578,7 +582,10 @@ impl Backend for HuggingFace {
     async fn get(&self, request: GetRequest) -> Result<GetResponse<Body>> {
         debug!(
             "get request {} {} {}: {:?}",
-            request.task_id, request.piece_id, request.url, request.http_header
+            request.task_id,
+            request.piece_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Build request headers, including authentication if provided hugging face token.
@@ -678,7 +685,10 @@ impl Backend for HuggingFace {
 
         debug!(
             "get response {} {}: {:?} {:?}",
-            request.task_id, request.piece_id, response_status_code, response_header,
+            request.task_id,
+            request.piece_id,
+            response_status_code,
+            KeyHeaderMap(&response_header),
         );
 
         Ok(GetResponse {
@@ -700,7 +710,9 @@ impl Backend for HuggingFace {
     async fn exists(&self, request: ExistsRequest) -> Result<bool> {
         debug!(
             "exists request {} {}: {:?}",
-            request.task_id, request.url, request.http_header
+            request.task_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Build request headers, including authentication if provided hugging face token.
@@ -754,7 +766,7 @@ impl Backend for HuggingFace {
                     request.task_id,
                     request.url,
                     response_status_code,
-                    response.headers()
+                    KeyHeaderMap(response.headers())
                 );
 
                 Ok(response_status_code.is_success())
@@ -781,7 +793,7 @@ impl Backend for HuggingFace {
                     request.task_id,
                     request.url,
                     response_status_code,
-                    response.headers()
+                    KeyHeaderMap(response.headers())
                 );
 
                 Ok(response_status_code.is_success())

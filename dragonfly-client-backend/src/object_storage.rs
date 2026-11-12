@@ -67,7 +67,7 @@ use dragonfly_api::common;
 use dragonfly_client_config::dfdaemon::Config;
 use dragonfly_client_core::error::BackendError;
 use dragonfly_client_core::{Error as ClientError, Result as ClientResult};
-use dragonfly_client_util::tls::NoVerifier;
+use dragonfly_client_util::{tls::NoVerifier, types::redacted::KeyHeaderMap};
 use futures::StreamExt;
 use opendal::{layers::HttpClientLayer, layers::TimeoutLayer, raw::HttpClient, Operator};
 use percent_encoding::percent_decode_str;
@@ -613,7 +613,9 @@ impl crate::Backend for ObjectStorage {
     async fn stat(&self, request: StatRequest) -> ClientResult<StatResponse> {
         debug!(
             "stat request {} {}: {:?}",
-            request.task_id, request.url, request.http_header
+            request.task_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Parse the URL and convert it to a ParsedURL for create the ObjectStorage operator.
@@ -700,7 +702,9 @@ impl crate::Backend for ObjectStorage {
     async fn get(&self, request: GetRequest) -> ClientResult<GetResponse<Body>> {
         debug!(
             "get request {} {}: {:?}",
-            request.piece_id, request.url, request.http_header
+            request.piece_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Parse the URL and convert it to a ParsedURL for create the ObjectStorage operator.
@@ -880,7 +884,9 @@ impl crate::Backend for ObjectStorage {
     async fn exists(&self, request: ExistsRequest) -> ClientResult<bool> {
         debug!(
             "exists request {} {}: {:?}",
-            request.task_id, request.url, request.http_header
+            request.task_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Parse the URL and convert it to a ParsedURL for create the ObjectStorage operator.

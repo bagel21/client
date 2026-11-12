@@ -42,6 +42,7 @@ use async_trait::async_trait;
 use dragonfly_api::common;
 use dragonfly_client_core::error::BackendError;
 use dragonfly_client_core::{Error as ClientError, Result as ClientResult};
+use dragonfly_client_util::types::redacted::KeyHeaderMap;
 use futures::StreamExt;
 use opendal::{layers::TimeoutLayer, Operator};
 use percent_encoding::percent_decode_str;
@@ -119,7 +120,9 @@ impl Backend for Hdfs {
     async fn stat(&self, request: StatRequest) -> ClientResult<StatResponse> {
         debug!(
             "stat request {} {}: {:?}",
-            request.task_id, request.url, request.http_header
+            request.task_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Parse the URL.
@@ -202,7 +205,9 @@ impl Backend for Hdfs {
     async fn get(&self, request: GetRequest) -> ClientResult<GetResponse<Body>> {
         debug!(
             "get request {} {}: {:?}",
-            request.piece_id, request.url, request.http_header
+            request.piece_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Parse the URL.
@@ -280,7 +285,9 @@ impl Backend for Hdfs {
     async fn exists(&self, request: ExistsRequest) -> ClientResult<bool> {
         debug!(
             "exist request {} {}: {:?}",
-            request.task_id, request.url, request.http_header
+            request.task_id,
+            request.url,
+            request.http_header.as_ref().map(KeyHeaderMap)
         );
 
         // Parse the URL.

@@ -18,8 +18,11 @@
 //! scoped subscriber, so they run in their own binary: a scoped subscriber
 //! misses events whose callsites other tests in the binary hit concurrently.
 
+use dragonfly_api::common::v2::HuggingFace as HuggingFaceOptions;
 use dragonfly_client_backend::http::{HTTP, HTTP_SCHEME};
-use dragonfly_client_backend::{Backend, GetRequest};
+use dragonfly_client_backend::hugging_face::HuggingFace;
+use dragonfly_client_backend::{Backend, GetRequest, StatRequest};
+use dragonfly_client_config::dfdaemon::Config;
 use reqwest::header::HeaderMap;
 use std::future::Future;
 use std::io::{Read, Seek};
@@ -85,5 +88,44 @@ async fn http_get_logs_redact_presigned_urls_and_credential_headers() {
     assert!(get.unwrap().success);
     assert!(logs.contains("caching temporary redirect"), "{logs}");
     assert!(logs.contains("X-Amz-Signature=[REDACTED]"), "{logs}");
+    assert!(!logs.contains("secret"), "{logs}");
+}
+
+#[tokio::test]
+async fn hugging_face_stat_logs_redact_credential_headers() {
+    let server = MockServer::start().await;
+    Mock::given(method("HEAD"))
+        .and(path("/owner/repo/resolve/main/model.bin"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-length", "4096")
+                .insert_header("set-cookie", "session=secret"),
+        )
+        .mount(&server)
+        .await;
+
+    let mut http_header = HeaderMap::new();
+    http_header.insert("authorization", "Bearer secret".parse().unwrap());
+    let backend = HuggingFace::new(Arc::new(Config::default())).unwrap();
+    let (stat, logs) = capture_logs(backend.stat(StatRequest {
+        task_id: "test".to_string(),
+        url: "hf://owner/repo/model.bin".to_string(),
+        http_header: Some(http_header),
+        timeout: Duration::from_secs(5),
+        client_cert: None,
+        object_storage: None,
+        hdfs: None,
+        hugging_face: Some(HuggingFaceOptions {
+            revision: "main".to_string(),
+            token: Some("secret".to_string()),
+            base_url: Some(server.uri()),
+        }),
+        model_scope: None,
+        open_csg: None,
+    }))
+    .await;
+
+    assert!(stat.unwrap().success);
+    assert!(logs.contains("stat response"), "{logs}");
     assert!(!logs.contains("secret"), "{logs}");
 }

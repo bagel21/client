@@ -34,6 +34,7 @@ use dragonfly_client_util::{
     http::{hashmap_to_headermap, headermap_to_hashmap},
     shutdown,
     tls::{generate_self_signed_certs_by_ca_cert, generate_simple_self_signed_certs, NoVerifier},
+    types::redacted::{RedactedRequest, RedactedUrl},
 };
 use futures::TryStreamExt;
 use http_body_util::{combinators::BoxBody, BodyExt, Empty, StreamBody};
@@ -57,7 +58,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{mpsc, Barrier};
 use tokio_rustls::TlsAcceptor;
 use tokio_stream::wrappers::ReceiverStream;
-use tracing::{debug, error, info, instrument, warn, Instrument, Span};
+use tracing::{debug, error, field, info, instrument, warn, Instrument, Span};
 
 pub mod header;
 pub mod query;
@@ -297,7 +298,10 @@ pub async fn handler(
     remote_ip: std::net::IpAddr,
 ) -> ClientResult<Response> {
     // Span record the url and method.
-    Span::current().record("url", request.uri().to_string().as_str());
+    Span::current().record(
+        "url",
+        field::display(RedactedUrl(&request.uri().to_string())),
+    );
     Span::current().record("method", request.method().as_str());
     Span::current().record("remote_ip", remote_ip.to_string().as_str());
 
@@ -479,7 +483,7 @@ pub async fn http_handler(
         if request.method() == Method::GET {
             info!(
                 "proxy HTTP request via dfdaemon by rule config: {:?}",
-                request
+                RedactedRequest(&request)
             );
 
             return proxy_via_dfdaemon(config.clone(), task, dynconfig, rule, request, remote_ip)
@@ -488,7 +492,7 @@ pub async fn http_handler(
 
         debug!(
             "proxy HTTP request bypassing dfdaemon for non-GET method: {:?}",
-            request
+            RedactedRequest(&request)
         );
     }
 
@@ -497,7 +501,7 @@ pub async fn http_handler(
     if header::get_use_p2p(request.headers()) {
         info!(
             "proxy HTTP request via dfdaemon by X-Dragonfly-Use-P2P header: {:?}",
-            request
+            RedactedRequest(&request)
         );
 
         if request.method() == Method::GET {
@@ -514,14 +518,14 @@ pub async fn http_handler(
 
         debug!(
             "proxy HTTP request bypassing dfdaemon for non-GET method: {:?}",
-            request
+            RedactedRequest(&request)
         );
     }
 
     if request.uri().scheme().cloned() == Some(http::uri::Scheme::HTTPS) {
         info!(
             "proxy HTTPS request directly to remote server: {:?}",
-            request
+            RedactedRequest(&request)
         );
 
         return proxy_via_https(request, https_client).await;
@@ -529,7 +533,7 @@ pub async fn http_handler(
 
     info!(
         "proxy HTTP request directly to remote server: {:?}",
-        request
+        RedactedRequest(&request)
     );
 
     return proxy_via_http(request, http_client).await;
@@ -549,7 +553,7 @@ pub async fn https_handler(
     request_rate_limiter: Arc<RateLimiter>,
     dynconfig: Arc<Dynconfig>,
 ) -> ClientResult<Response> {
-    debug!("handle HTTPS request: {:?}", request);
+    debug!("handle HTTPS request: {:?}", RedactedRequest(&request));
 
     // Proxy the request directly  to the remote server.
     if let Some(host) = request.uri().host() {
@@ -685,7 +689,10 @@ pub async fn upgraded_handler(
     dynconfig: Arc<Dynconfig>,
 ) -> ClientResult<Response> {
     // Span record the url and method.
-    Span::current().record("url", request.uri().to_string().as_str());
+    Span::current().record(
+        "url",
+        field::display(RedactedUrl(&request.uri().to_string())),
+    );
     Span::current().record("method", request.method().as_str());
     Span::current().record("remote_ip", remote_ip.to_string().as_str());
 
@@ -763,7 +770,7 @@ pub async fn upgraded_handler(
         if request.method() == Method::GET {
             info!(
                 "proxy HTTPS request via dfdaemon by rule config: {:?}",
-                request,
+                RedactedRequest(&request),
             );
 
             return proxy_via_dfdaemon(config.clone(), task, dynconfig, rule, request, remote_ip)
@@ -772,7 +779,7 @@ pub async fn upgraded_handler(
 
         debug!(
             "proxy HTTPS request bypassing dfdaemon for non-GET method: {:?}",
-            request,
+            RedactedRequest(&request),
         );
     }
 
@@ -782,7 +789,7 @@ pub async fn upgraded_handler(
         if request.method() == Method::GET {
             info!(
                 "proxy HTTP request via dfdaemon by X-Dragonfly-Use-P2P header: {:?}",
-                request,
+                RedactedRequest(&request),
             );
 
             return proxy_via_dfdaemon(
@@ -798,14 +805,14 @@ pub async fn upgraded_handler(
 
         debug!(
             "proxy HTTPS request bypassing dfdaemon for non-GET method: {:?}",
-            request,
+            RedactedRequest(&request),
         );
     }
 
     if request.uri().scheme().cloned() == Some(http::uri::Scheme::HTTPS) {
         info!(
             "proxy HTTPS request directly to remote server: {:?}",
-            request,
+            RedactedRequest(&request),
         );
 
         return proxy_via_https(request, https_client).await;
@@ -813,7 +820,7 @@ pub async fn upgraded_handler(
 
     info!(
         "proxy HTTP request directly to remote server: {:?}",
-        request,
+        RedactedRequest(&request),
     );
 
     return proxy_via_http(request, http_client).await;

@@ -70,7 +70,7 @@ use dragonfly_client_util::{
     },
     ratelimiter::bbr::BBR,
     shutdown,
-    types::redacted::{RedactedDownload, RedactedDownloadPersistentTaskRequest},
+    types::redacted::{RedactedDownload, RedactedDownloadPersistentTaskRequest, RedactedUrl},
 };
 use hyper_util::rt::TokioIo;
 use opentelemetry::Context;
@@ -90,7 +90,7 @@ use tonic::{
     Code, Request, Response, Status,
 };
 use tower::service_fn;
-use tracing::{debug, error, info, instrument, warn, Instrument, Span};
+use tracing::{debug, error, field, info, instrument, warn, Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use url::Url;
 
@@ -365,7 +365,7 @@ impl DfdaemonDownload for DfdaemonDownloadServerHandler {
         Span::current().record("host_id", host_id.as_str());
         Span::current().record("task_id", task_id.as_str());
         Span::current().record("peer_id", peer_id.as_str());
-        Span::current().record("url", download.url.clone());
+        Span::current().record("url", field::display(RedactedUrl(&download.url)));
         Span::current().record(
             "remote_ip",
             download.remote_ip.clone().unwrap_or_default().as_str(),
@@ -906,7 +906,7 @@ impl DfdaemonDownload for DfdaemonDownloadServerHandler {
 
         // Span record the task id and url.
         Span::current().record("task_id", request.task_id.as_str());
-        Span::current().record("url", request.url.as_str());
+        Span::current().record("url", field::display(RedactedUrl(&request.url)));
         Span::current().record(
             "remote_ip",
             request.remote_ip.clone().unwrap_or_default().as_str(),
